@@ -75,7 +75,7 @@ The script refuses to run unless it can read the current flight mode. Without th
 4. Leave all other settings at their defaults.
 5. Go back to the Mixer overview and repeat steps 2–4 for the **Pitch / Ele** channel — this time picking `1-wobble/Pitch` as the source.
 
-The source names follow the EdgeTX convention `<slot>-<filename>/<output>`. The leading `1-` is the Mixer-Scripts slot the script occupies (LUA1 = slot 1) and is set automatically by EdgeTX. If you place `wobble` in a different slot (e.g. LUA2), the sources become `2-wobble/Roll` and `2-wobble/Pitch` accordingly.
+> The source names follow the EdgeTX convention `<slot>-<filename>/<output>`. The leading `1-` is the Mixer-Scripts slot the script occupies (LUA1 = slot 1) and is set automatically by EdgeTX. If you place `wobble` in a different slot (e.g. LUA2), the sources become `2-wobble/Roll` and `2-wobble/Pitch` accordingly.
 
 ### 5. Test it on the bench
 
