@@ -1,4 +1,4 @@
-# wobble-script
+# edgetx-pid-wobble
 
 ![wobble-script banner](docs/banner.png)
 
