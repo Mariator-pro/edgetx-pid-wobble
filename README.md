@@ -72,10 +72,10 @@ The script refuses to run unless it can read the current flight mode. Without th
 1. Open **Model Settings → Mixes**.
 2. Click the **Roll / Ail** channel and choose **Insert after** to add a new line below the existing stick mix.
 3. Under **Source**, switch to the **Lua Scripts** tab and select `1-wobble/Roll`.
-4. Leave all other settings at their defaults.
-5. Go back to the Mixer overview and repeat steps 2–4 for the **Pitch / Ele** channel — this time picking `1-wobble/Pitch` as the source.
-
 > The source names follow the EdgeTX convention `<slot>-<filename>/<output>`. The leading `1-` is the Mixer-Scripts slot the script occupies (LUA1 = slot 1) and is set automatically by EdgeTX. If you place `wobble` in a different slot (e.g. LUA2), the sources become `2-wobble/Roll` and `2-wobble/Pitch` accordingly.
+4. Leave all other settings at their defaults.
+> **Optional:** Assign your `EnableSwitch` source to each mixer line's **Switch** field — this gates the line at the mixer level, independent of the script's own interlocks.
+5. Go back to the Mixer overview and repeat steps 2–4 for the **Pitch / Ele** channel — this time picking `1-wobble/Pitch` as the source.
 
 ### 5. Test it on the bench
 
