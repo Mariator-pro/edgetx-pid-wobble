@@ -8,8 +8,10 @@
 -- ----- Konfiguration (vom Anwender bei Bedarf anpassbar) -------------
 
 -- Stuetzpunkt-Tabellen der Wobble-Kurven (33 Punkte, Y-Werte in -100..+100).
--- Quelle: Kontext/wobblekurven.md. Aenderungen an der Wobble-Amplitude
--- erfolgen ausschliesslich durch Editieren dieser Tabellen.
+-- Quelle: Kontext/wobblekurven.md. Statische Aenderungen der Wobble-Amplitude
+-- erfolgen durch Editieren dieser Tabellen; eine optionale Laufzeit-Skalierung
+-- ueber den dritten Script-Input "AmpScale" ist zusaetzlich verfuegbar (siehe
+-- run() und Spec-Abschnitt "Amplituden-Skalierung per Quelle").
 local ROLL_CURVE_Y = {
   --  1    2    3    4    5
       0,   0,   0,   0,   0,
@@ -49,6 +51,11 @@ local PITCH_CURVE_Y = {
 -- "STAB" deckt ArduPilot-Copter Stabilize ab.
 local ANGLE_MODE_TOKENS = { "ANGL", "STAB" }
 
+-- Stick-Override-Schwelle: ab Betragswert > THRESHOLD auf Roll- ODER
+-- Pitch-Stick pausiert der Wobble (Pilot-Korrektur hat Vorrang).
+-- 205 entspricht ca. 20 % der EdgeTX-Skala (-1024..+1024).
+local STICK_OVERRIDE_THRESHOLD = 205
+
 -- ----- Konstanten ----------------------------------------------------
 
 local CYCLE_MS     = 3000              -- Zykluslaenge in ms
@@ -57,6 +64,12 @@ local SWEEP_MIN    = -1024
 local SWEEP_MAX    =  1024
 local SWEEP_RANGE  = SWEEP_MAX - SWEEP_MIN
 local OUTPUT_SCALE = 1024 / 100        -- Curve-Y (-100..+100) -> EdgeTX (-1024..+1024)
+
+-- Amplituden-Skalierung via "AmpScale"-Input: linear gemappt um 1.0 herum.
+-- AmpScale = -1024 -> Faktor 0.5 (-50 % Amplitude),  +1024 -> 1.5 (+50 %).
+local SCALE_HALFRANGE = 0.5
+local SCALE_MIN       = 1.0 - SCALE_HALFRANGE
+local SCALE_MAX       = 1.0 + SCALE_HALFRANGE
 
 -- ----- Persistenter Zustand (Closure-Persistenz beim Reload) ---------
 
@@ -115,9 +128,17 @@ local function isAngleMode()
   return false
 end
 
+-- Stick-Override-Check: liefert true, wenn beide Sticks (Roll/Pitch)
+-- innerhalb der Schwelle liegen. Die EdgeTX-Trims sind in den Werten
+-- bereits enthalten (post-Trim, pre-Mixer).
+local function isStickCentered()
+  return math.abs(getValue("ail")) <= STICK_OVERRIDE_THRESHOLD
+     and math.abs(getValue("ele")) <= STICK_OVERRIDE_THRESHOLD
+end
+
 -- ----- Hauptschleife (Mix-Script-Tick, ~30 Hz) -----------------------
 
-local function run(enableRaw, wobbleRaw)
+local function run(enableRaw, wobbleRaw, ampScaleRaw)
   -- Erster Tick nach (Re-)Load: Referenz speichern, KEINE Flankenauswertung.
   if prevEnableRaw == nil then
     prevEnableRaw = enableRaw
@@ -135,8 +156,8 @@ local function run(enableRaw, wobbleRaw)
   -- Aktivierungs-Schalter level-getriggert (Schwelle > 0).
   local wobbleOn = wobbleRaw > 0
 
-  -- Drei-Bedingungen-Verriegelung. Bei jedem Fail: sofort 0/0, Zyklus reset.
-  if not (enabled and wobbleOn and isAngleMode()) then
+  -- Vier-Bedingungen-Verriegelung. Bei jedem Fail: sofort 0/0, Zyklus reset.
+  if not (enabled and wobbleOn and isAngleMode() and isStickCentered()) then
     cycleStartTicks = nil
     return 0, 0
   end
@@ -159,13 +180,21 @@ local function run(enableRaw, wobbleRaw)
   local rollY  = applyCurve(ROLL_CURVE_Y,  sweep)
   local pitchY = applyCurve(PITCH_CURVE_Y, sweep)
 
-  return rollY * OUTPUT_SCALE, pitchY * OUTPUT_SCALE
+  -- Optionale Amplituden-Skalierung. Nicht zugewiesene Quelle -> ampScaleRaw=0
+  -- -> scale=1.0 (heutiges Verhalten). Clamping schuetzt vor Quellen mit
+  -- erweitertem Wertebereich (z. B. GVARs ueber +/-1024).
+  local scale = 1.0 + (ampScaleRaw / 1024) * SCALE_HALFRANGE
+  if scale < SCALE_MIN then scale = SCALE_MIN
+  elseif scale > SCALE_MAX then scale = SCALE_MAX end
+
+  return rollY * scale * OUTPUT_SCALE, pitchY * scale * OUTPUT_SCALE
 end
 
 return {
   input = {
     { "Enable", SOURCE },   -- EnableSwitch (Freigabe, flankengetriggert)
     { "Wobble", SOURCE },   -- WobbleSwitch (Aktivierung, level-getriggert)
+    { "AmpScale", SOURCE }, -- AmpScale (optional, -1024..+1024 -> 0.5x..1.5x)
   },
   output = { "Roll", "Pitch" },
   run = run,

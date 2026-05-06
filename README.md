@@ -25,6 +25,8 @@ Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick 
 - **Continuous cycle** that loops seamlessly as long as the wobble is active.
 - **Roll and pitch run simultaneously but time-interleaved** — pitch wobbles in the front half of the cycle, roll in the back half — so PIDtoolbox sees clean data on both axes.
 - **Additive mixing** with the existing stick input: the pilot can override the wobble at any moment by moving the sticks.
+- **Amplitude control** *(optional)*: a free-to-assign poti or switch scales the wobble strength by ±50% during the flight.
+- **Auto-pause on stick override:** when the pilot moves the roll or pitch stick beyond ~20%, the wobble pauses automatically so manual corrections aren't disturbed, and resumes once both sticks return to center.
 - **Two-stage safety interlock:** the wobble can only start when both an explicit *enable* switch (edge-triggered, no auto-release at boot) **and** an *activation* switch are set, **and** the flight controller reports Angle mode via telemetry.
 
 ## Requirements
@@ -60,9 +62,10 @@ The script refuses to run unless it can read the current flight mode. Without th
 
 1. **Model Settings → Mixer Scripts**.
 2. Pick a free slot and select `wobble`.
-3. Map the two inputs to the switches you want to use:
+3. Map the inputs to the switches you want to use:
    - **Enable** — your release switch (edge-triggered: must be flipped OFF→ON **after** boot to grant release)
    - **Wobble** — your activation switch (level-triggered: wobble runs while up, stops the moment it goes down)
+   - **AmpScale** *(optional)* — a poti or switch to scale the wobble amplitude live: at −100% the wobble runs at 50% strength, at +100% at 150%, at 0 or unassigned at the unchanged 100%
 4. Save.
 
 > **About switch positions:** A source value `> 0` is treated as ON, `≤ 0` as OFF. On a 3-position switch, only the **upper** position counts as ON — the middle position is OFF, so an accidental nudge into mid won't release or activate the wobble.
