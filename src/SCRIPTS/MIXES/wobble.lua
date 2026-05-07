@@ -1,17 +1,16 @@
 -- =====================================================================
 -- wobble.lua  --  EdgeTX Mix Script for automated PID-tuning wobbles
 -- =====================================================================
--- Vollstaendige Architektur- und Verhaltensbeschreibung: siehe CLAUDE.md
--- Pfad auf SD-Karte: /SCRIPTS/MIXES/wobble.lua
+-- SD card path: /SCRIPTS/MIXES/wobble.lua
 -- =====================================================================
 
--- ----- Konfiguration (vom Anwender bei Bedarf anpassbar) -------------
+-- ----- Configuration (user-adjustable as needed) ---------------------
 
--- Stuetzpunkt-Tabellen der Wobble-Kurven (33 Punkte, Y-Werte in -100..+100).
--- Quelle: Kontext/wobblekurven.md. Statische Aenderungen der Wobble-Amplitude
--- erfolgen durch Editieren dieser Tabellen; eine optionale Laufzeit-Skalierung
--- ueber den dritten Script-Input "AmpScale" ist zusaetzlich verfuegbar (siehe
--- run() und Spec-Abschnitt "Amplituden-Skalierung per Quelle").
+-- Control-point tables for the wobble curves (33 points, Y values in -100..+100).
+-- Source: Kontext/wobblekurven.md. Static changes to the wobble amplitude are
+-- made by editing these tables; an optional runtime scaling via the third
+-- script input "AmpScale" is additionally available (see run() and the spec
+-- section on amplitude scaling via source).
 local ROLL_CURVE_Y = {
   --  1    2    3    4    5
       0,   0,   0,   0,   0,
@@ -46,41 +45,41 @@ local PITCH_CURVE_Y = {
       0, -50,   0,
 }
 
--- Whitelist der zulaessigen Flight-Mode-Substrings (Sensor "FM").
--- "ANGL" deckt Betaflight + INAV ab (inkl. "ANGL*" wenn armed).
--- "STAB" deckt ArduPilot-Copter Stabilize ab.
+-- Whitelist of accepted flight-mode substrings (sensor "FM").
+-- "ANGL" covers Betaflight + INAV (including "ANGL*" when armed).
+-- "STAB" covers ArduPilot Copter Stabilize.
 local ANGLE_MODE_TOKENS = { "ANGL", "STAB" }
 
--- Stick-Override-Schwelle: ab Betragswert > THRESHOLD auf Roll- ODER
--- Pitch-Stick pausiert der Wobble (Pilot-Korrektur hat Vorrang).
--- 205 entspricht ca. 20 % der EdgeTX-Skala (-1024..+1024).
+-- Stick-override threshold: when |value| > THRESHOLD on either the Roll or
+-- Pitch stick, the wobble pauses (pilot correction takes precedence).
+-- 205 corresponds to roughly 20% of the EdgeTX scale (-1024..+1024).
 local STICK_OVERRIDE_THRESHOLD = 205
 
--- ----- Konstanten ----------------------------------------------------
+-- ----- Constants -----------------------------------------------------
 
-local CYCLE_MS     = 3000              -- Zykluslaenge in ms
-local CYCLE_TICKS  = CYCLE_MS / 10     -- getTime() liefert 10-ms-Ticks
+local CYCLE_MS     = 3000              -- Cycle length in ms
+local CYCLE_TICKS  = CYCLE_MS / 10     -- getTime() returns 10-ms ticks
 local SWEEP_MIN    = -1024
 local SWEEP_MAX    =  1024
 local SWEEP_RANGE  = SWEEP_MAX - SWEEP_MIN
-local OUTPUT_SCALE = 1024 / 100        -- Curve-Y (-100..+100) -> EdgeTX (-1024..+1024)
+local OUTPUT_SCALE = 1024 / 100        -- Curve Y (-100..+100) -> EdgeTX (-1024..+1024)
 
--- Amplituden-Skalierung via "AmpScale"-Input: linear gemappt um 1.0 herum.
--- AmpScale = -1024 -> Faktor 0.5 (-50 % Amplitude),  +1024 -> 1.5 (+50 %).
+-- Amplitude scaling via the "AmpScale" input: linearly mapped around 1.0.
+-- AmpScale = -1024 -> factor 0.5 (-50% amplitude), +1024 -> 1.5 (+50%).
 local SCALE_HALFRANGE = 0.5
 local SCALE_MIN       = 1.0 - SCALE_HALFRANGE
 local SCALE_MAX       = 1.0 + SCALE_HALFRANGE
 
--- ----- Persistenter Zustand (Closure-Persistenz beim Reload) ---------
+-- ----- Persistent state (closure persistence across reload) ----------
 
-local enabled         = false   -- Freigabe (durch EnableSwitch-Flanke gesetzt)
-local prevEnableRaw   = nil     -- nil bis zum ersten Tick (siehe Spec)
-local cycleStartTicks = nil     -- 10-ms-Tick des aktuellen Zyklus-Starts; nil = nicht laufend
+local enabled         = false   -- Enable flag (set by EnableSwitch edge)
+local prevEnableRaw   = nil     -- nil until the first tick (see spec)
+local cycleStartTicks = nil     -- 10-ms tick of the current cycle start; nil = not running
 
--- ----- Curve-Handling ------------------------------------------------
+-- ----- Curve handling ------------------------------------------------
 
--- Catmull-Rom-aequivalente kubische Hermite-Interpolation
--- (entspricht dem Smoothing der EdgeTX-Custom-Curves bei Smoothing=Ein).
+-- Cubic Hermite interpolation equivalent to Catmull-Rom
+-- (matches the smoothing of EdgeTX custom curves with Smoothing=On).
 local function hermite(p0, p1, p2, p3, t)
   local t2 = t * t
   local t3 = t2 * t
@@ -92,13 +91,13 @@ local function hermite(p0, p1, p2, p3, t)
        + (t3  - t2)        * m2
 end
 
--- Wendet die uebergebene Stuetzpunkt-Tabelle auf einen Sweep-Wert
--- aus [-1024..+1024] an und liefert den Y-Wert in Curve-Skala (-100..+100).
+-- Applies the given control-point table to a sweep value in [-1024..+1024]
+-- and returns the Y value in curve scale (-100..+100).
 local function applyCurve(y, sweep)
   local n = #y
   if n < 2 then return y[1] or 0 end
 
-  -- Sweep auf Punktindex [1..n] mappen.
+  -- Map sweep to point index [1..n].
   local pos = (sweep - SWEEP_MIN) / SWEEP_RANGE * (n - 1) + 1
   if pos <= 1 then return y[1] end
   if pos >= n then return y[n] end
@@ -112,12 +111,12 @@ local function applyCurve(y, sweep)
   return hermite(p0, p1, p2, p3, t)
 end
 
--- ----- Sicherheits-Checks --------------------------------------------
+-- ----- Safety checks -------------------------------------------------
 
 local function isAngleMode()
   local fm = getValue("FM")
   if type(fm) ~= "string" or fm == "" then
-    -- Sensor fehlt, Telemetrie-Ausfall, oder numerischer Wert -> Fail-Safe.
+    -- Sensor missing, telemetry loss, or numeric value -> fail-safe.
     return false
   end
   for i = 1, #ANGLE_MODE_TOKENS do
@@ -128,24 +127,24 @@ local function isAngleMode()
   return false
 end
 
--- Stick-Override-Check: liefert true, wenn beide Sticks (Roll/Pitch)
--- innerhalb der Schwelle liegen. Die EdgeTX-Trims sind in den Werten
--- bereits enthalten (post-Trim, pre-Mixer).
+-- Stick-override check: returns true when both sticks (Roll/Pitch) are
+-- within the threshold. EdgeTX trims are already baked into the values
+-- (post-trim, pre-mixer).
 local function isStickCentered()
   return math.abs(getValue("ail")) <= STICK_OVERRIDE_THRESHOLD
      and math.abs(getValue("ele")) <= STICK_OVERRIDE_THRESHOLD
 end
 
--- ----- Hauptschleife (Mix-Script-Tick, ~30 Hz) -----------------------
+-- ----- Main loop (mix-script tick, ~30 Hz) ---------------------------
 
 local function run(enableRaw, wobbleRaw, ampScaleRaw)
-  -- Erster Tick nach (Re-)Load: Referenz speichern, KEINE Flankenauswertung.
+  -- First tick after (re-)load: store reference, NO edge evaluation.
   if prevEnableRaw == nil then
     prevEnableRaw = enableRaw
     return 0, 0
   end
 
-  -- Freigabe-Schalter flankengetriggert auswerten.
+  -- Evaluate the enable switch as edge-triggered.
   if prevEnableRaw <= 0 and enableRaw > 0 then
     enabled = true
   elseif prevEnableRaw > 0 and enableRaw <= 0 then
@@ -153,23 +152,23 @@ local function run(enableRaw, wobbleRaw, ampScaleRaw)
   end
   prevEnableRaw = enableRaw
 
-  -- Aktivierungs-Schalter level-getriggert (Schwelle > 0).
+  -- Activation switch is level-triggered (threshold > 0).
   local wobbleOn = wobbleRaw > 0
 
-  -- Vier-Bedingungen-Verriegelung. Bei jedem Fail: sofort 0/0, Zyklus reset.
+  -- Four-condition interlock. On any failure: immediately 0/0, reset cycle.
   if not (enabled and wobbleOn and isAngleMode() and isStickCentered()) then
     cycleStartTicks = nil
     return 0, 0
   end
 
-  -- Aktiver Zustand: Zyklus starten oder fortsetzen.
+  -- Active state: start or continue the cycle.
   local now = getTime()
   if cycleStartTicks == nil then
     cycleStartTicks = now
   end
 
-  -- Endlos-Lauf: nach Punkt 33 nahtlos im selben Tick zurueck zu Punkt 1.
-  -- Schleife schuetzt vor verschluckten Ticks ueber mehrere Zyklen hinweg.
+  -- Endless run: after point 33 wrap seamlessly back to point 1 within the
+  -- same tick. The loop guards against dropped ticks spanning multiple cycles.
   local elapsedTicks = now - cycleStartTicks
   while elapsedTicks >= CYCLE_TICKS do
     cycleStartTicks = cycleStartTicks + CYCLE_TICKS
@@ -180,9 +179,9 @@ local function run(enableRaw, wobbleRaw, ampScaleRaw)
   local rollY  = applyCurve(ROLL_CURVE_Y,  sweep)
   local pitchY = applyCurve(PITCH_CURVE_Y, sweep)
 
-  -- Optionale Amplituden-Skalierung. Nicht zugewiesene Quelle -> ampScaleRaw=0
-  -- -> scale=1.0 (heutiges Verhalten). Clamping schuetzt vor Quellen mit
-  -- erweitertem Wertebereich (z. B. GVARs ueber +/-1024).
+  -- Optional amplitude scaling. Unassigned source -> ampScaleRaw=0 ->
+  -- scale=1.0 (current behavior). Clamping guards against sources with
+  -- an extended value range (e.g. GVARs beyond +/-1024).
   local scale = 1.0 + (ampScaleRaw / 1024) * SCALE_HALFRANGE
   if scale < SCALE_MIN then scale = SCALE_MIN
   elseif scale > SCALE_MAX then scale = SCALE_MAX end
@@ -192,8 +191,8 @@ end
 
 return {
   input = {
-    { "Enable", SOURCE },   -- EnableSwitch (Freigabe, flankengetriggert)
-    { "Wobble", SOURCE },   -- WobbleSwitch (Aktivierung, level-getriggert)
+    { "Enable", SOURCE },   -- EnableSwitch (enable, edge-triggered)
+    { "Wobble", SOURCE },   -- WobbleSwitch (activation, level-triggered)
     { "AmpScale", SOURCE }, -- AmpScale (optional, -1024..+1024 -> 0.5x..1.5x)
   },
   output = { "Roll", "Pitch" },

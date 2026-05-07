@@ -91,7 +91,7 @@ The script refuses to run unless it can read the current flight mode. Without th
 - **Script doesn't show up under Mixer Scripts:** Check the file name — it must be exactly `wobble.lua` (max. 6 characters before `.lua`, otherwise EdgeTX hides mixer scripts).
 - **Wobble never starts, even with both switches up:** Verify that the `FM` sensor exists in the model's telemetry list and currently shows a valid string (e.g. `ANGL` or `STAB`). Without it the safety interlock blocks the wobble.
 - **Wobble doesn't start after boot although Enable is up:** That's by design — the Enable switch is edge-triggered. Flip it OFF→ON once after boot to grant release.
-- **Sticks feel sluggish or off-center while the wobble is off:** The mixer multiplex must be `Add` (the EdgeTX default), not `Replace`. With `Replace`, an inactive wobble would stomp the stick input.
+- **Roll or pitch don't respond to the sticks at all:** The mixer multiplex on the wobble line is set to `Replace` instead of `Add` (the EdgeTX default). With `Replace`, the script's output completely overrides the stick input.
 
 ## Credits
 
