@@ -4,17 +4,14 @@
 
 An EdgeTX Lua mix script that generates continuous, time-interleaved wobbles on roll and pitch — producing high-quality stick input for PID tuning with the PIDtoolbox.
 
-> ⚠️ **Work in progress**
-> First stable release coming soon.
-
 ## Compatibility
 
 | Component   | Minimum Version | Tested On | Test Hardware                              |
 |-------------|-----------------|-----------|--------------------------------------------|
 | EdgeTX      | v2.10           | v2.12.0   | Radiomaster TX15, Radiomaster TX16S MK3    |
-| ExpressLRS  | v4.0.0          | v4.0.0    | Radiomaster RP1 V2, RP3 V2, RP4TD          |
+| ExpressLRS  | v3.0.0          | v4.0.0    | Radiomaster RP1 V2, RP3 V2, RP4TD          |
 
-The script is implemented as a **Mix Script** and therefore only runs on EdgeTX radios with sufficient flash/RAM — in practice, **only color-display radios**. Radios without a Custom Scripts entry in the model menu are **not supported**.
+The script is implemented as a **Mixer Script** and therefore only runs on EdgeTX radios with sufficient flash/RAM — in practice, **only color-display radios**. Radios without a Mixer Scripts entry in the model menu are **not supported**.
 
 ## What is it for?
 
@@ -23,7 +20,7 @@ Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick 
 `wobble.lua` solves that by generating a deterministic excitation pattern in the radio itself:
 
 - **Continuous cycle** that loops seamlessly as long as the wobble is active.
-- **Roll and pitch run simultaneously but time-interleaved** — pitch wobbles in the front half of the cycle, roll in the back half — so PIDtoolbox sees clean data on both axes.
+- **Roll and pitch run simultaneously but time-interleaved** — each axis has quiet windows where the other carries the excitation — so PIDtoolbox sees clean data on both axes.
 - **Additive mixing** with the existing stick input: the pilot can override the wobble at any moment by moving the sticks.
 - **Amplitude control** *(optional)*: a free-to-assign poti or switch scales the wobble strength by ±50% during the flight.
 - **Auto-pause on stick override:** when the pilot moves the roll or pitch stick beyond ~20%, the wobble pauses automatically so manual corrections aren't disturbed, and resumes once both sticks return to center.
@@ -32,7 +29,9 @@ Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick 
 ## Requirements
 
 - A radio running EdgeTX 2.10 or newer (color-display models only)
-- An ExpressLRS receiver running firmware 4.0 or newer with telemetry enabled
+  > The `v2.10` minimum is the earliest version verified on hardware. The script likely runs on older 2.x builds too, but those are untested — reports welcome.
+- An ExpressLRS receiver running firmware 3.0 or newer with telemetry enabled
+  > The `v3.0.0` minimum is the earliest version verified on hardware. The script likely runs on older 2.x builds too, but those are untested — reports welcome.
 - A flight controller that exposes its flight mode via CRSF telemetry. Supported out of the box:
   - **Betaflight** / **INAV** in `ANGL` mode (Angle / Self-level)
   - **ArduPilot Copter** in `STAB` mode (Stabilize)
@@ -58,17 +57,17 @@ The script refuses to run unless it can read the current flight mode. Without th
 2. **Model Settings → Telemetry → Discover new sensors**.
 3. Confirm that the entry **`FM`** (text sensor) appears in the sensor list.
 
-### 3. Register the script as a Mix Script
+### 3. Register the script as a Mixer Script
 
 1. **Model Settings → Mixer Scripts**.
 2. Pick a free slot and select `wobble`.
 3. Map the inputs to the switches you want to use:
    - **Enable** — your release switch (edge-triggered: must be flipped OFF→ON **after** boot to grant release)
    - **Wobble** — your activation switch (level-triggered: wobble runs while up, stops the moment it goes down)
-   - **AmpScale** *(optional)* — a poti or switch to scale the wobble amplitude live: at −100% the wobble runs at 50% strength, at +100% at 150%, at 0 or unassigned at the unchanged 100%
+   - **AmpScale** *(optional)* — a poti or switch to scale the wobble amplitude live: at −100% the wobble runs at 50% strength, at +100% at 150%. Centered or unassigned → 100% (unchanged).
 4. Save.
 
-> **About switch positions:** A source value `> 0` is treated as ON, `≤ 0` as OFF. On a 3-position switch, only the **upper** position counts as ON — the middle position is OFF, so an accidental nudge into mid won't release or activate the wobble.
+> **About switch positions for Enable and Wobble:** A source value `> 0` is treated as ON, `≤ 0` as OFF. On a 3-position switch, only the **upper** position counts as ON — the middle position is OFF, so an accidental nudge into mid won't release or activate the wobble.
 
 ### 4. Wire the Mix outputs into Roll and Pitch
 
@@ -89,7 +88,7 @@ The script refuses to run unless it can read the current flight mode. Without th
 
 ## Troubleshooting
 
-- **Script doesn't show up under Custom Scripts:** Check the file name — it must be exactly `wobble.lua` (max. 6 characters before `.lua`, otherwise EdgeTX hides mix scripts).
+- **Script doesn't show up under Mixer Scripts:** Check the file name — it must be exactly `wobble.lua` (max. 6 characters before `.lua`, otherwise EdgeTX hides mixer scripts).
 - **Wobble never starts, even with both switches up:** Verify that the `FM` sensor exists in the model's telemetry list and currently shows a valid string (e.g. `ANGL` or `STAB`). Without it the safety interlock blocks the wobble.
 - **Wobble doesn't start after boot although Enable is up:** That's by design — the Enable switch is edge-triggered. Flip it OFF→ON once after boot to grant release.
 - **Sticks feel sluggish or off-center while the wobble is off:** The mixer multiplex must be `Add` (the EdgeTX default), not `Replace`. With `Replace`, an inactive wobble would stomp the stick input.
