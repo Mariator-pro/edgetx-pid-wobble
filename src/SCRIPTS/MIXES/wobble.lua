@@ -55,6 +55,12 @@ local ANGLE_MODE_TOKENS = { "ANGL", "STAB" }
 -- 205 corresponds to roughly 20% of the EdgeTX scale (-1024..+1024).
 local STICK_OVERRIDE_THRESHOLD = 205
 
+-- Stick-override release cooldown: once the sticks return centered, the
+-- wobble stays paused for this duration so the pilot can re-stabilise the
+-- copter before the next cycle starts.
+local STICK_OVERRIDE_COOLDOWN_MS    = 2000
+local STICK_OVERRIDE_COOLDOWN_TICKS = STICK_OVERRIDE_COOLDOWN_MS / 10
+
 -- ----- Constants -----------------------------------------------------
 
 local CYCLE_MS     = 3000              -- Cycle length in ms
@@ -72,9 +78,10 @@ local SCALE_MAX       = 1.0 + SCALE_HALFRANGE
 
 -- ----- Persistent state (closure persistence across reload) ----------
 
-local enabled         = false   -- Enable flag (set by EnableSwitch edge)
-local prevEnableRaw   = nil     -- nil until the first tick (see spec)
-local cycleStartTicks = nil     -- 10-ms tick of the current cycle start; nil = not running
+local enabled            = false   -- Enable flag (set by EnableSwitch edge)
+local prevEnableRaw      = nil     -- nil until the first tick (see spec)
+local cycleStartTicks    = nil     -- 10-ms tick of the current cycle start; nil = not running
+local stickOverrideTicks = nil     -- Most recent tick a stick override was active; nil after the cooldown expired
 
 -- ----- Curve handling ------------------------------------------------
 
@@ -155,14 +162,36 @@ local function run(enableRaw, wobbleRaw, ampScaleRaw)
   -- Activation switch is level-triggered (threshold > 0).
   local wobbleOn = wobbleRaw > 0
 
-  -- Four-condition interlock. On any failure: immediately 0/0, reset cycle.
-  if not (enabled and wobbleOn and isAngleMode() and isStickCentered()) then
+  -- Track stick-override release. While the sticks are outside the
+  -- threshold, refresh stickOverrideTicks every tick; once they return
+  -- centered the value freezes at the release tick and acts as the
+  -- cooldown anchor.
+  local now            = getTime()
+  local sticksCentered = isStickCentered()
+  if not sticksCentered then
+    stickOverrideTicks = now
+  end
+
+  -- Stick-override cooldown: stay paused for STICK_OVERRIDE_COOLDOWN_TICKS
+  -- after release so the pilot can re-stabilise before the next cycle.
+  local cooldownActive = false
+  if stickOverrideTicks ~= nil then
+    if now - stickOverrideTicks < STICK_OVERRIDE_COOLDOWN_TICKS then
+      cooldownActive = true
+    else
+      stickOverrideTicks = nil
+    end
+  end
+
+  -- Four-condition interlock plus post-release cooldown. On any failure:
+  -- immediately 0/0, reset cycle.
+  if not (enabled and wobbleOn and isAngleMode() and sticksCentered)
+     or cooldownActive then
     cycleStartTicks = nil
     return 0, 0
   end
 
   -- Active state: start or continue the cycle.
-  local now = getTime()
   if cycleStartTicks == nil then
     cycleStartTicks = now
   end
