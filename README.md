@@ -4,7 +4,29 @@
 
 An EdgeTX Lua mix script that generates continuous, time-interleaved wobbles on roll and pitch — producing high-quality stick input for PID tuning with the PIDtoolbox.
 
-## Compatibility
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![EdgeTX](https://img.shields.io/badge/EdgeTX-%E2%89%A5%202.10-brightgreen)](https://edgetx.org)
+[![ExpressLRS](https://img.shields.io/badge/ExpressLRS-%E2%89%A5%204.0-orange)](https://www.expresslrs.org)
+[![GitHub issues](https://img.shields.io/github/issues/Mariator-pro/edgetx-pid-wobble)](../../issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/Mariator-pro/edgetx-pid-wobble)](../../commits/main)
+
+---
+
+## 📚 Table of Contents
+
+- [📋 Compatibility](#-compatibility)
+- [🎯 What is it for?](#-what-is-it-for)
+- [🧰 Requirements](#-requirements)
+- [📥 Installation](#-installation)
+- [🛠️ Troubleshooting](#-troubleshooting)
+- [💡 Credits](#-credits)
+- [🤝 Contributing](#-contributing)
+- [⚠️ Disclaimer](#-disclaimer)
+- [📄 License](#-license)
+
+---
+
+## 📋 Compatibility
 
 | Component   | Minimum Version | Tested On | Test Hardware                              |
 |-------------|-----------------|-----------|--------------------------------------------|
@@ -13,7 +35,9 @@ An EdgeTX Lua mix script that generates continuous, time-interleaved wobbles on 
 
 The script is implemented as a **Mixer Script** and therefore only runs on EdgeTX radios with sufficient flash/RAM — in practice, **only color-display radios**. Radios without a Mixer Scripts entry in the model menu are **not supported**.
 
-## What is it for?
+---
+
+## 🎯 What is it for?
 
 Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick excitations on both axes. Doing this by hand produces inconsistent input — the analysis becomes noisy, the result less reliable.
 
@@ -26,7 +50,9 @@ Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick 
 - **Auto-pause on stick override:** when the pilot moves the roll or pitch stick beyond ~20%, the wobble pauses automatically so manual corrections aren't disturbed, and resumes once both sticks return to center.
 - **Two-stage safety interlock:** the wobble can only start when both an explicit *enable* switch (edge-triggered, no auto-release at boot) **and** an *activation* switch are set, **and** the flight controller reports Angle mode via telemetry.
 
-## Requirements
+---
+
+## 🧰 Requirements
 
 - A radio running EdgeTX 2.10 or newer (color-display models only)
   > The `v2.10` minimum is the earliest version verified on hardware. The script likely runs on older 2.x builds too, but those are untested — reports welcome.
@@ -37,7 +63,9 @@ Tuning a flight controller with the PIDtoolbox requires clean, repeatable stick 
   - **ArduPilot Copter** in `STAB` mode (Stabilize)
 - The text sensor `FM` must be discovered on the radio (it appears automatically after a telemetry discovery)
 
-## Installation
+---
+
+## 📥 Installation
 
 ### 1. Copy the file to the SD card
 
@@ -86,25 +114,35 @@ The script refuses to run unless it can read the current flight mode. Without th
 3. Flip Enable from OFF→ON, then move the Wobble switch to ON. The roll and pitch outputs should start their sweep — visible on the radio's channel monitor.
 4. Confirm that the wobble stops immediately as soon as **any** activation condition is no longer met — i.e. flip the Wobble switch off, the Enable switch off, or switch the FC out of Angle mode. The roll and pitch outputs must jump back to `0` in the same tick, with no fade or held last value.
 
-## Troubleshooting
+---
+
+## 🛠️ Troubleshooting
 
 - **Script doesn't show up under Mixer Scripts:** Check the file name — it must be exactly `wobble.lua` (max. 6 characters before `.lua`, otherwise EdgeTX hides mixer scripts).
 - **Wobble never starts, even with both switches up:** Verify that the `FM` sensor exists in the model's telemetry list and currently shows a valid string (e.g. `ANGL` or `STAB`). Without it the safety interlock blocks the wobble.
 - **Wobble doesn't start after boot although Enable is up:** That's by design — the Enable switch is edge-triggered. Flip it OFF→ON once after boot to grant release.
 - **Roll or pitch don't respond to the sticks at all:** The mixer multiplex on the wobble line is set to `Replace` instead of `Add` (the EdgeTX default). With `Replace`, the script's output completely overrides the stick input.
 
-## Credits
+---
+
+## 💡 Credits
 
 The idea for this script comes from the PIDtoolbox YouTube video ["An 'Auto Wobble' Controller from your open/edgeTX radio"](https://www.youtube.com/watch?v=NczSDkKn9pY), which explains the manual wobble procedure for PID analysis.
 
-## Contributing
+---
+
+## 🤝 Contributing
 
 Found a bug, have an idea for an improvement, or running an FC firmware whose flight-mode strings aren't covered yet? Please [open an issue](../../issues) on GitHub. Pull requests are welcome too.
 
-## Disclaimer
+---
+
+## ⚠️ Disclaimer
 
 This script is provided **as is** and is intended as a tuning aid only. It actively injects stick input into the roll and pitch channels and must therefore only be enabled in a controlled environment — at safe altitude, away from people and obstacles, with the pilot ready to take over via the sticks at any moment. The built-in safety interlocks (Enable switch, activation switch, Angle-mode telemetry check) reduce the risk of accidental triggering, but they do **not** replace careful flying within visual range, your own judgement, or the safety mechanisms of your transmitter, receiver and flight controller. Use at your own risk.
 
-## License
+---
+
+## 📄 License
 
 Released under the [MIT License](LICENSE).
