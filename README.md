@@ -4,7 +4,7 @@
 
 An EdgeTX Lua mix script that generates continuous, time-interleaved wobbles on roll and pitch — producing high-quality stick input for PID tuning with the PIDtoolbox.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](LICENSE)
 [![EdgeTX](https://img.shields.io/badge/EdgeTX-%E2%89%A5%202.10-brightgreen)](https://edgetx.org)
 [![ExpressLRS](https://img.shields.io/badge/ExpressLRS-%E2%89%A5%204.0-orange)](https://www.expresslrs.org)
 [![GitHub issues](https://img.shields.io/github/issues/Mariator-pro/edgetx-pid-wobble)](../../issues)
@@ -145,4 +145,4 @@ This script is provided **as is** and is intended as a tuning aid only. It activ
 
 ## 📄 License
 
-Released under the [MIT License](LICENSE).
+Released under the [GNU General Public License v2.0](LICENSE).
