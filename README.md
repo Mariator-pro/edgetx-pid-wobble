@@ -127,7 +127,7 @@ The script refuses to run unless it can read the current flight mode. Without th
 
 ## 💡 Credits
 
-The idea for this script comes from the PIDtoolbox YouTube video ["An 'Auto Wobble' Controller from your open/edgeTX radio"](https://www.youtube.com/watch?v=NczSDkKn9pY), which explains the manual wobble procedure for PID analysis.
+Inspired by the PIDtoolbox YouTube video ["An 'Auto Wobble' Controller from your open/edgeTX radio"](https://www.youtube.com/watch?v=NczSDkKn9pY), which explains how to build the wobble curves manually in the radio.
 
 ---
 
